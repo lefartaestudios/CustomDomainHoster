@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Connect a custom domain</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#eef2f6;--panel:#fff;--ink:#14202b;--mute:#586674;--line:#d3dce5;--acc:#0e7c86;--acc-ink:#fff;--ok:#1b7f4b;--warn:#a96a00;--code:#0f1a24;--code-ink:#d8e6f0;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e151c;--panel:#17212b;--ink:#e6edf3;--mute:#93a3b2;--line:#2a3846;--acc:#3cc3cf;--acc-ink:#06212a;--ok:#4cc58a;--warn:#e0a63c;--code:#0a1117;--code-ink:#d8e6f0}}
+:root[data-theme="dark"]{--bg:#0e151c;--panel:#17212b;--ink:#e6edf3;--mute:#93a3b2;--line:#2a3846;--acc:#3cc3cf;--acc-ink:#06212a;--ok:#4cc58a;--warn:#e0a63c;--code:#0a1117;--code-ink:#d8e6f0}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:32px 20px 64px}
+h1{font-size:clamp(28px,5vw,42px);line-height:1.1;margin:0 0 8px;letter-spacing:-.02em}
+h2{font-size:18px;margin:0 0 12px}
+p{margin:0 0 12px;max-width:68ch}
+.lead{color:var(--mute);font-size:18px;margin-bottom:28px}
+.grid{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.add{display:flex;gap:8px;margin-bottom:6px}
+input{flex:1;min-width:0;font:inherit;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+button{font:inherit;font-weight:500;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 14px}
+button.primary{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+button:focus-visible,input:focus-visible,li[role=button]:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.err{color:var(--warn);min-height:22px;font-size:14px;margin:0 0 8px}
+ul{list-style:none;margin:0;padding:0}
+li.dom{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer}
+li.dom[aria-current=true]{border-color:var(--acc);box-shadow:inset 3px 0 0 var(--acc)}
+.name{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:14px;overflow-wrap:anywhere}
+.chip{font-size:13px;font-weight:500;white-space:nowrap}
+.chip.ok{color:var(--ok)}.chip.wait{color:var(--warn)}
+.empty{color:var(--mute);font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+.scroll{overflow-x:auto}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--mute)}
+td.m{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;overflow-wrap:anywhere}
+.actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.note{color:var(--mute);font-size:14px;margin-top:12px}
+pre{background:var(--code);color:var(--code-ink);border-radius:8px;padding:14px;overflow-x:auto;font:13px/1.6 "IBM Plex Mono",ui-monospace,monospace;margin:0 0 12px}
+.below{margin-top:28px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Connect a custom domain</h1>
+  <p class="lead">Point your own domain at your site: add it, set two DNS records, then verify.</p>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="h-add">
+      <h2 id="h-add">Your domains</h2>
+      <div class="add">
+        <input id="in" placeholder="www.example.com" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Domain name">
+        <button class="primary" id="addBtn">Add domain</button>
+      </div>
+      <p class="err" id="err" role="alert"></p>
+      <ul id="list"></ul>
+    </section>
+
+    <section class="panel" id="detail" aria-live="polite"></section>
+  </div>
+
+  <section class="panel below">
+    <h2>Serving it for real</h2>
+    <p>This page is the control panel. Actually answering requests for customer domains needs a server that you run. The pattern: one public IP, a reverse proxy that issues a certificate the first time a verified domain is requested, and a lookup that maps each hostname to a site.</p>
+    <pre>{
+  on_demand_tls {
+    ask http://localhost:9000/is-verified
+  }
+}
+
+https:// {
+  tls {
+    on_demand
+  }
+  reverse_proxy localhost:3000
+}</pre>
+    <p>Your app at <span class="name">localhost:3000</span> reads the <span class="name">Host</span> header and returns the matching site. The <span class="name">/is-verified</span> endpoint answers 200 only for domains that passed the TXT check, so nobody can request certificates for domains they don’t own.</p>
+  </section>
+</main>
+
+<script>
+(function(){
+  var EDGE_HOST="sites.yourplatform.example", EDGE_IP="203.0.113.10", KEY="cd-domains";
+  var domains=[], sel=null;
+  try{var s=localStorage.getItem(KEY); if(s) domains=JSON.parse(s)||[];}catch(e){}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(domains));}catch(e){}}
+  function $(id){return document.getElementById(id)}
+  function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+  function token(){var a="abcdefghjkmnpqrstuvwxyz23456789",t="";for(var i=0;i<16;i++)t+=a[Math.floor(Math.random()*a.length)];return "verify-"+t}
+  var RE=/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+  function add(){
+    var v=$("in").value.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/.*$/,"");
+    var err=$("err"); err.textContent="";
+    if(!RE.test(v)){err.textContent="Enter a domain like www.example.com, without a path or spaces.";return}
+    if(domains.some(function(d){return d.name===v})){err.textContent=v+" is already on your list.";return}
+    domains.push({name:v,token:token(),verified:false}); sel=v; $("in").value=""; save(); render();
+  }
+  function isApex(n){return n.split(".").length<=2}
+
+  function render(){
+    var l=$("list");
+    if(!domains.length){l.innerHTML='<li class="empty">No domains yet. Add one to see the DNS records to set.</li>';}
+    else l.innerHTML=domains.map(function(d){
+      return '<li class="dom" role="button" tabindex="0" data-n="'+esc(d.name)+'"'+(d.name===sel?' aria-current="true"':'')+'><span class="name">'+esc(d.name)+'</span><span class="chip '+(d.verified?'ok':'wait')+'">'+(d.verified?'Live':'Needs DNS')+'</span></li>';
+    }).join("");
+    var d=domains.filter(function(x){return x.name===sel})[0], p=$("detail");
+    if(!d){p.innerHTML='<h2>DNS records</h2><p class="empty">Select a domain to see the records it needs.</p>';return}
+    var rec1=isApex(d.name)?["A","@",EDGE_IP]:["CNAME",d.name.split(".")[0],EDGE_HOST];
+    p.innerHTML='<h2>Set these records for <span class="name">'+esc(d.name)+'</span></h2>'+
+      '<p>Add both records at your DNS provider. Changes can take from a few minutes to a few hours to spread.</p>'+
+      '<div class="scroll"><table><thead><tr><th>Type</th><th>Name</th><th>Value</th></tr></thead><tbody>'+
+      '<tr><td class="m">'+rec1[0]+'</td><td class="m">'+esc(rec1[1])+'</td><td class="m">'+esc(rec1[2])+'</td></tr>'+
+      '<tr><td class="m">TXT</td><td class="m">_verify</td><td class="m">'+esc(d.token)+'</td></tr></tbody></table></div>'+
+      '<div class="actions"><button class="primary" id="ver"'+(d.verified?' disabled':'')+'>'+(d.verified?'Verified':'Verify DNS')+'</button>'+
+      '<button id="copy">Copy token</button><button id="rm">Remove</button></div>'+
+      '<p class="note" id="msg">'+(d.verified?'DNS matched. Certificate issued and the site is live on this domain.':'The TXT record proves you own the domain; the '+rec1[0]+' record sends visitors here.')+'</p>'+
+      '<p class="note">Demo: verification is simulated here, since a web page can’t query DNS itself.</p>';
+    var ver=$("ver"); if(ver) ver.onclick=function(){
+      ver.disabled=true; ver.textContent="Checking DNS…"; $("msg").textContent="Looking up the TXT and routing records.";
+      setTimeout(function(){d.verified=true;save();render()},1400)};
+    $("copy").onclick=function(){var b=this;
+      function done(){b.textContent="Copied";setTimeout(function(){b.textContent="Copy token"},1200)}
+      try{navigator.clipboard.writeText(d.token).then(done,done)}catch(e){done()}};
+    $("rm").onclick=function(){domains=domains.filter(function(x){return x!==d});sel=domains.length?domains[0].name:null;save();render()};
+  }
+  $("list").addEventListener("click",function(e){var li=e.target.closest("li.dom");if(li){sel=li.dataset.n;render()}});
+  $("list").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){var li=e.target.closest("li.dom");if(li){e.preventDefault();sel=li.dataset.n;render()}}});
+  $("addBtn").onclick=add;
+  $("in").addEventListener("keydown",function(e){if(e.key==="Enter")add()});
+  if(domains.length) sel=domains[0].name;
+  render();
+})();
+</script>
+</body>
+</html>
