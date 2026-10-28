@@ -43,6 +43,16 @@ td.m{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;overflow-
 .note{color:var(--mute);font-size:14px;margin-top:12px}
 pre{background:var(--code);color:var(--code-ink);border-radius:8px;padding:14px;overflow-x:auto;font:13px/1.6 "IBM Plex Mono",ui-monospace,monospace;margin:0 0 12px}
 .below{margin-top:28px}
+.fh{margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:18px;text-align:center;color:var(--mute);margin:10px 0}
+.drop.over{border-color:var(--acc);background:var(--bg)}
+.drop button{margin:8px 4px 0}
+.frow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.frow .sz{color:var(--mute);white-space:nowrap}
+.frow button{padding:3px 9px;font-size:13px}
+.frow.idx .name{color:var(--ok);font-weight:600}
+button:disabled{opacity:.5;cursor:not-allowed}
+iframe.pv{width:100%;height:320px;border:1px solid var(--line);border-radius:8px;margin-top:12px;background:#fff}
 </style>
 </head>
 <body>
@@ -103,6 +113,53 @@ https:// {
   }
   function isApex(n){return n.split(".").length<=2}
 
+  var store={};
+  function toData(f){return new Promise(function(r){var fr=new FileReader();fr.onload=function(){r(fr.result)};fr.readAsDataURL(f)})}
+  function size(n){return n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(1)+" MB"}
+  function wireFiles(d){
+    var list=store[d.name]=store[d.name]||[], drop=$("drop");
+    function hasIndex(){return list.some(function(x){return x.path.toLowerCase()==="index.html"})}
+    function paint(){
+      $("fl").innerHTML=list.map(function(x,i){
+        var ix=x.path.toLowerCase()==="index.html";
+        return '<div class="frow'+(ix?' idx':'')+'"><span class="name">'+esc(x.path)+'</span><span class="sz">'+size(x.file.size)+'</span><button data-i="'+i+'">Remove</button></div>';
+      }).join("");
+      var ok=hasIndex();
+      $("prev").disabled=!ok; $("pub").disabled=!ok;
+      $("fmsg").textContent=!list.length?(d.pubCount?"Published with "+d.pubCount+" files earlier. Files aren’t kept after a reload, so add them again to change the site.":"No files yet."):ok?list.length+" file"+(list.length>1?"s":"")+" ready. index.html found.":"index.html is missing. Add it at the top level to publish.";
+    }
+    function addFiles(fs){
+      Array.prototype.forEach.call(fs,function(f){
+        var p=(f.webkitRelativePath||f.name).split("/");
+        if(f.webkitRelativePath) p.shift();
+        var path=p.join("/"); if(!path||!f.size&&!f.type&&!f.name.includes(".")) return;
+        list=list.filter(function(x){return x.path!==path}); list.push({path:path,file:f});
+      });
+      store[d.name]=list; paint();
+    }
+    $("pickF").onclick=function(){$("fIn").click()};
+    $("pickD").onclick=function(){$("dIn").click()};
+    $("fIn").onchange=function(){addFiles(this.files);this.value=""};
+    $("dIn").onchange=function(){addFiles(this.files);this.value=""};
+    drop.ondragover=function(e){e.preventDefault();drop.classList.add("over")};
+    drop.ondragleave=function(){drop.classList.remove("over")};
+    drop.ondrop=function(e){e.preventDefault();drop.classList.remove("over");addFiles(e.dataTransfer.files)};
+    $("fl").onclick=function(e){var b=e.target.closest("button");if(b){list.splice(+b.dataset.i,1);store[d.name]=list;$("pvbox").innerHTML="";paint()}};
+    $("pub").onclick=function(){d.pubCount=list.length;save();$("fmsg").textContent="Published "+list.length+" files for "+d.name+". Demo: files stay in this browser until a server stores them."};
+    $("prev").onclick=function(){
+      var idx=list.filter(function(x){return x.path.toLowerCase()==="index.html"})[0];
+      Promise.all(list.map(function(x){return toData(x.file)})).then(function(urls){
+        var map={}; list.forEach(function(x,i){map[x.path]=urls[i]});
+        return idx.file.text().then(function(t){
+          var html=t.replace(/(src|href)=(["'])([^"']+)\2/gi,function(m,a,q,v){var k=v.replace(/^\.\//,"");return map[k]?a+"="+q+map[k]+q:m});
+          var fr=document.createElement("iframe"); fr.className="pv"; fr.title="Site preview"; fr.setAttribute("sandbox","allow-scripts"); fr.srcdoc=html;
+          $("pvbox").innerHTML=""; $("pvbox").appendChild(fr);
+        });
+      });
+    };
+    paint();
+  }
+
   function render(){
     var l=$("list");
     if(!domains.length){l.innerHTML='<li class="empty">No domains yet. Add one to see the DNS records to set.</li>';}
@@ -120,10 +177,16 @@ https:// {
       '<div class="actions"><button class="primary" id="ver"'+(d.verified?' disabled':'')+'>'+(d.verified?'Verified':'Verify DNS')+'</button>'+
       '<button id="copy">Copy token</button><button id="rm">Remove</button></div>'+
       '<p class="note" id="msg">'+(d.verified?'DNS matched. Certificate issued and the site is live on this domain.':'The TXT record proves you own the domain; the '+rec1[0]+' record sends visitors here.')+'</p>'+
-      '<p class="note">Demo: verification is simulated here, since a web page can’t query DNS itself.</p>';
+      '<p class="note">Demo: verification is simulated here, since a web page can’t query DNS itself.</p>'+
+      '<h2 class="fh">Site files</h2><p>Upload the files for this site. A top-level <span class="name">index.html</span> is required before you can publish.</p>'+
+      '<div class="drop" id="drop">Drop files here<br><button id="pickF">Choose files</button><button id="pickD">Choose folder</button></div>'+
+      '<input type="file" id="fIn" multiple hidden><input type="file" id="dIn" webkitdirectory hidden>'+
+      '<div id="fl"></div><div class="actions"><button id="prev" disabled>Preview</button><button class="primary" id="pub" disabled>Publish site</button></div>'+
+      '<p class="note" id="fmsg" aria-live="polite"></p><div id="pvbox"></div>';
     var ver=$("ver"); if(ver) ver.onclick=function(){
       ver.disabled=true; ver.textContent="Checking DNS…"; $("msg").textContent="Looking up the TXT and routing records.";
       setTimeout(function(){d.verified=true;save();render()},1400)};
+    wireFiles(d);
     $("copy").onclick=function(){var b=this;
       function done(){b.textContent="Copied";setTimeout(function(){b.textContent="Copy token"},1200)}
       try{navigator.clipboard.writeText(d.token).then(done,done)}catch(e){done()}};
